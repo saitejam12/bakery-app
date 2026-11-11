@@ -2,6 +2,380 @@
 openapi: 3.1.0
 info:
   title: Bakery App - sonartest
-  version: architecture-v0
+  version: architecture-v1
   description: Designed API from the approved architecture (not extracted from code).
-paths: {}
+paths:
+  /admin/menu-items:
+    get:
+      summary: List all menu items including sold-out for staff management.
+      description: List all menu items including sold-out for staff management.
+      operationId: get_admin_menu_items
+      parameters: []
+      responses:
+        '200':
+          description: '[{id, category_id, name, price, photo_url, is_sold_out, options:[...]}]'
+      security:
+      - bearerAuth: []
+    post:
+      summary: Create a menu item with name, category, price, optional options.
+      description: Create a menu item with name, category, price, optional options.
+      operationId: post_admin_menu_items
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: '{name, category_id, price, options:[{name}]}'
+      responses:
+        '200':
+          description: '{id, ...}'
+      security:
+      - bearerAuth: []
+  /admin/menu-items/{id}:
+    put:
+      summary: Edit an item's name, category, price or options.
+      description: Edit an item's name, category, price or options.
+      operationId: put_admin_menu_items_id
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: '{name, category_id, price, options:[...]}'
+      responses:
+        '200':
+          description: '{id, ...}'
+      security:
+      - bearerAuth: []
+  /admin/menu-items/{id}/availability:
+    patch:
+      summary: Mark an item sold out or available.
+      description: Mark an item sold out or available.
+      operationId: patch_admin_menu_items_id_availability
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: '{is_sold_out: true|false}'
+      responses:
+        '200':
+          description: '{id, is_sold_out}'
+      security:
+      - bearerAuth: []
+  /admin/menu-items/{id}/photo:
+    post:
+      summary: Upload a photo for an item to S3 and store its URL on the item.
+      description: Upload a photo for an item to S3 and store its URL on the item.
+      operationId: post_admin_menu_items_id_photo
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: multipart/form-data file
+      responses:
+        '200':
+          description: '{id, photo_url}'
+      security:
+      - bearerAuth: []
+  /auth/login:
+    post:
+      summary: Staff sign-in; verifies hashed password, creates a server-side session,
+        returns an opaque bearer token in the body.
+      description: Staff sign-in; verifies hashed password, creates a server-side
+        session, returns an opaque bearer token in the body.
+      operationId: post_auth_login
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: '{username, password}'
+      responses:
+        '200':
+          description: '{token, expires_at}'
+  /auth/logout:
+    post:
+      summary: Revoke the current session so the bearer token no longer works.
+      description: Revoke the current session so the bearer token no longer works.
+      operationId: post_auth_logout
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: 'Authorization: Bearer <token>'
+      responses:
+        '200':
+          description: 204 No Content
+      security:
+      - bearerAuth: []
+  /menu/categories:
+    get:
+      summary: List menu categories in display order for the kiosk home screen.
+      description: List menu categories in display order for the kiosk home screen.
+      operationId: get_menu_categories
+      parameters: []
+      responses:
+        '200':
+          description: '[{id, name, display_order}]'
+  /menu/categories/{category_id}/items:
+    get:
+      summary: List items in a category with name, price, photo_url, sold-out flag
+        and options.
+      description: List items in a category with name, price, photo_url, sold-out
+        flag and options.
+      operationId: get_menu_categories_category_id_items
+      parameters:
+      - name: category_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: '[{id, name, price, photo_url, is_sold_out, options:[{id,name}]}]'
+  /orders:
+    get:
+      summary: Read-only list of stored orders with token, lines, status and timestamp
+        for the future tracking app.
+      description: Read-only list of stored orders with token, lines, status and timestamp
+        for the future tracking app.
+      operationId: get_orders
+      parameters: []
+      responses:
+        '200':
+          description: '[{id, token_number, token_date, status, total, created_at,
+            lines:[...]}]'
+    post:
+      summary: Confirm an order from a non-empty cart; validates availability, issues
+        the next daily token transactionally, persists or
+      description: Confirm an order from a non-empty cart; validates availability,
+        issues the next daily token transactionally, persists order and lines, returns
+        token with pay-at-counter message.
+      operationId: post_orders
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: '{lines:[{menu_item_id, quantity, selected_options:[...]}]}'
+      responses:
+        '200':
+          description: '{id, token_number, token_date, total, status, message:''Pay
+            at the counter on collection''}'
+  /orders/{id_or_token}:
+    get:
+      summary: Read-only fetch of a single order by its id or token for the current
+        day's token.
+      description: Read-only fetch of a single order by its id or token for the current
+        day's token.
+      operationId: get_orders_id_or_token
+      parameters:
+      - name: id_or_token
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: '{id, token_number, token_date, status, total, created_at,
+            lines:[...]}'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    categories:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        display_order:
+          type: integer
+      required:
+      - id
+      - name
+      - display_order
+    menu_items:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        category_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        price:
+          type: number
+        photo_url:
+          type: string
+        is_sold_out:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - category_id
+      - name
+      - price
+      - is_sold_out
+      - created_at
+      - updated_at
+    menu_item_options:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        menu_item_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        display_order:
+          type: integer
+      required:
+      - id
+      - menu_item_id
+      - name
+      - display_order
+    orders:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        token_number:
+          type: integer
+        token_date:
+          type: string
+          format: date
+        status:
+          type: string
+        total:
+          type: number
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - token_number
+      - token_date
+      - status
+      - total
+      - created_at
+    order_lines:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        order_id:
+          type: string
+          format: uuid
+        menu_item_id:
+          type: string
+          format: uuid
+        item_name:
+          type: string
+        unit_price:
+          type: number
+        quantity:
+          type: integer
+        line_total:
+          type: number
+        selected_options:
+          type: string
+      required:
+      - id
+      - order_id
+      - item_name
+      - unit_price
+      - quantity
+      - line_total
+    daily_token_counter:
+      type: object
+      properties:
+        token_date:
+          type: string
+          format: date
+        last_token:
+          type: integer
+      required:
+      - token_date
+      - last_token
+    staff_users:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        password_hash:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - username
+      - password_hash
+      - created_at
+    staff_sessions:
+      type: object
+      properties:
+        token:
+          type: string
+        staff_user_id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        last_activity_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+      required:
+      - token
+      - staff_user_id
+      - created_at
+      - last_activity_at
+      - expires_at
